@@ -1,0 +1,14 @@
+# Secrets and environment files
+.env
+.env.example
+.env.local
+.env.production
+.streamlit/secrets.toml
+config.ini
+secrets.json
+
+# API keys and credentials
+**/secrets/
+**/*secret*
+**/*password*
+**/*token*
