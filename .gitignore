@@ -1,15 +1,18 @@
-# Secrets and environment files
-.env
-.environment
-.env.example
-.env.local
-.env.production
-.streamlit/secrets.toml
-config.ini
-secrets.json
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
 
-# API keys and credentials
-**/secrets/
-**/*secret*
-**/*password*
-**/*token*
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.coverage
+.pytest_cache/
+
+# Environment variables
+.env
