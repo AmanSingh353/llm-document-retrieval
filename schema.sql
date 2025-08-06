@@ -1,0 +1,7 @@
+CREATE TABLE file_metadata (
+    id SERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    user_id INTEGER NOT NULL,
+    upload_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sha256_hash CHAR(64) NOT NULL
+);

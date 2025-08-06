@@ -3,6 +3,8 @@ import sys
 import tempfile
 from dotenv import load_dotenv
 import streamlit as st
+import traceback
+import json
 
 # 1)  Make sure project root is on sys.path
 # --------------------------------------------------
@@ -13,11 +15,12 @@ if ROOT_DIR not in sys.path:
 # --------------------------------------------------
 # 2)  Environment variables
 # --------------------------------------------------
-load_dotenv()                                  # reads .env if present
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-if not OPENAI_API_KEY:
+load_dotenv()
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
+
+if not PERPLEXITY_API_KEY:
     st.error(
-        "Environment variable OPENAI_API_KEY is missing. "
+        "Environment variable PERPLEXITY_API_KEY is missing. "
         "Add it to your system env or a .env file."
     )
     st.stop()
@@ -29,7 +32,6 @@ from src.data.loader import load_data
 from src.retrieval.retriever import Retriever
 from src.llm.llm_interface import LLMInterface
 from src.types.index import QueryInput
-from src.utils.helpers import format_response
 
 # --------------------------------------------------
 # 4)  Streamlit UI
@@ -73,26 +75,87 @@ if st.button("🔍 Run Query"):
                 # ---- b) Load docs and build retriever ----
                 documents = load_data(tmp_dir)
                 retriever = Retriever(documents)
-                llm = LLMInterface(openai_api_key=OPENAI_API_KEY)
+                llm = LLMInterface(perplexity_api_key=PERPLEXITY_API_KEY)
 
-                # ---- c) Run retrieval ----
+                # ---- c) Run retrieval with error handling ----
                 parsed_query = QueryInput(raw_query=query)
-                relevant_chunks = retriever.retrieve(parsed_query.raw_query)
+                
+                try:
+                    relevant_chunks = retriever.retrieve(parsed_query.raw_query)
+                except Exception as e:
+                    st.error("❌ Error during document retrieval")
+                    st.code(traceback.format_exc(), language="python")
+                    st.stop()
 
                 if not relevant_chunks:
                     st.info("No relevant content found for this query.")
                     st.stop()
 
-                # ---- d) Call LLM ----
-                response = llm.process_query(parsed_query, relevant_chunks)
+                # ---- d) Call LLM with error handling ----
+                try:
+                    response = llm.process_query(parsed_query, relevant_chunks)
+                except Exception as e:
+                    st.error("❌ Error during LLM processing")
+                    st.code(traceback.format_exc(), language="python")
+                    st.stop()
 
-            # ---- e) Show results ----
+            # ---- e) Show results (UPDATED - bypass format_response) ----
             st.subheader("✅ Structured Response")
-            st.json(format_response(response))
+            
+            # Handle response display safely without format_response function
+            if isinstance(response, dict):
+                # Response is already a dictionary, display directly
+                st.json(response)
+                
+                # Also display answer prominently if available
+                if "answer" in response:
+                    st.markdown("### 📝 Answer:")
+                    st.write(response["answer"])
+                    
+            elif isinstance(response, str):
+                # Try to parse as JSON, fallback to text display
+                try:
+                    parsed_response = json.loads(response)
+                    st.json(parsed_response)
+                    if isinstance(parsed_response, dict) and "answer" in parsed_response:
+                        st.markdown("### 📝 Answer:")
+                        st.write(parsed_response["answer"])
+                except json.JSONDecodeError:
+                    st.markdown("### 📝 Response:")
+                    st.write(response)
+            else:
+                # Fallback for any other type
+                st.markdown("### 📝 Response:")
+                st.write(str(response))
 
+            # ---- f) Display retrieved chunks safely ----
             st.subheader("📄 Retrieved Clauses")
-            for chunk in relevant_chunks:
-                st.code(chunk.content.strip(), language="markdown")
+            if relevant_chunks:
+                for i, chunk in enumerate(relevant_chunks):
+                    try:
+                        # Handle different chunk formats safely
+                        if hasattr(chunk, 'content'):
+                            # It's a proper DocumentChunk object
+                            content = chunk.content
+                        elif isinstance(chunk, dict):
+                            # It's a dictionary - extract content
+                            content = chunk.get('content', chunk.get('page_content', str(chunk)))
+                        else:
+                            # Fallback for unexpected formats
+                            content = str(chunk)
+                        
+                        # Make sure content is a string before calling strip()
+                        if isinstance(content, str) and content.strip():
+                            st.code(content.strip(), language="markdown")
+                        else:
+                            st.code(str(content), language="text")
+                            
+                    except Exception as e:
+                        st.write(f"⚠️ Could not display chunk {i+1}: {str(e)}")
+                        st.code(str(chunk), language="text")
+            else:
+                st.info("No relevant content retrieved from the documents.")
 
         except Exception as err:
-            st.error(f"❌ An unexpected error occurred:\n{err}")
+            st.error("❌ An unexpected error occurred")
+            st.code(traceback.format_exc(), language="python")

@@ -1,65 +1,51 @@
-# src/utils/helpers.py
-
-import datetime
 import json
-from typing import List, Dict, Optional
-import os
+import re
 
-
-def format_response(answer: str) -> str:
+def format_response(response):
     """
-    Format LLM answer for output. You can extend this with markdown or styling.
+    Safely format response for JSON display in Streamlit
     """
-    return f"### ✅ Response\n\n{answer.strip()}"
-
-
-def log_query(
-    user_query: str,
-    relevant_docs: List[Dict],
-    answer: str,
-    username: Optional[str] = "anonymous",
-    log_file: str = "logs/audit_log.jsonl"
-):
-    """
-    Logs the user query, relevant document IDs, and the final LLM answer.
-    Saved in JSONL format for easy audit and parsing.
-    """
-    log_entry = {
-        "timestamp": datetime.datetime.now().isoformat(),
-        "username": username,
-        "query": user_query,
-        "docs_considered": [doc.get("id", "?") for doc in relevant_docs],
-        "response": {
-            "decision": extract_decision(answer),
-            "amount": extract_amount(answer),
-            "justification": answer.strip(),
-            "clauses": [doc.get("clause_id", "?") for doc in relevant_docs if "clause_id" in doc]
+    if isinstance(response, dict):
+        # Already a dictionary, return as-is
+        return response
+    
+    elif isinstance(response, str):
+        # Try to parse as JSON first
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # If JSON parsing fails, try to fix common issues
+            try:
+                # Fix missing quotes around property names
+                fixed_json = fix_malformed_json(response)
+                return json.loads(fixed_json)
+            except:
+                # If still fails, return as simple dict
+                return {
+                    "answer": response.strip(),
+                    "justification": "Response format could not be parsed as JSON"
+                }
+    else:
+        # Fallback for other types
+        return {
+            "answer": str(response),
+            "justification": "Non-string response converted to string"
         }
-    }
 
-    os.makedirs(os.path.dirname(log_file), exist_ok=True)
-
-    with open(log_file, "a", encoding="utf-8") as f:
-        f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
-
-
-def extract_decision(text: str) -> str:
+def fix_malformed_json(json_string):
     """
-    Dummy logic to extract decision from the LLM answer.
-    Customize this based on how your LLM answers are structured.
+    Fix common JSON formatting issues
     """
-    text_lower = text.lower()
-    if "approved" in text_lower:
-        return "Approved"
-    elif "rejected" in text_lower or "not covered" in text_lower:
-        return "Rejected"
-    return "Unknown"
-
-
-def extract_amount(text: str) -> Optional[str]:
-    """
-    Dummy logic to extract amount (if mentioned) from LLM answer.
-    """
-    import re
-    match = re.search(r"(?:₹|\$|Rs\.?)\s?\d+(?:,\d{3})*", text)
-    return match.group(0) if match else None
+    # Remove extra whitespace and newlines
+    json_string = json_string.strip()
+    
+    # Fix unquoted property names
+    json_string = re.sub(r'(\w+):', r'"\1":', json_string)
+    
+    # Ensure the string is properly wrapped in braces if missing
+    if not json_string.startswith('{'):
+        json_string = '{' + json_string
+    if not json_string.endswith('}'):
+        json_string = json_string + '}'
+    
+    return json_string
