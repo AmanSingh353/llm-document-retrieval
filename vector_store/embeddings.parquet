@@ -1,0 +1,8 @@
+import pandas as pd
+df = pd.DataFrame({
+    "document": documents,
+    "hash": hashes,
+    "metadata": metadata
+})
+df.to_parquet("embeddings.parquet")
+s
