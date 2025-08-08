@@ -14,3 +14,15 @@ python-dotenv>=1.0.0
 # Optional - For docx/email/text support
 unstructured>=0.10.0
 python-docx>=1.0.0
+
+flask
+PyPDF2
+python-dotenv
+requests
+sqlite3  # Usually built-in
+hashlib  # Built-in
+langchain-community
+langchain
+sentence-transformers
+faiss-cpu
+streamlit

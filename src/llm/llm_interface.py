@@ -19,7 +19,7 @@ class LLMInterface:
         }
     
     def process_query(self, parsed_query: QueryInput, chunks: List[DocumentChunk]):
-        """Process query using Perplexity API"""
+        """Process query using Perplexity API with safe JSON handling"""
         
         if not chunks:
             return {
@@ -51,7 +51,7 @@ Answer based only on the provided information."""
         
         # Updated payload with current model
         payload = {
-            "model": "sonar",  # ✅ UPDATED: Using current model name
+            "model": "sonar",
             "messages": [
                 {
                     "role": "system",
@@ -75,14 +75,30 @@ Answer based only on the provided information."""
                 timeout=30
             )
             
+            # Check response status first
             if response.status_code != 200:
                 return {
                     "answer": f"API Error: {response.status_code} - {response.text}",
                     "justification": "Perplexity API call failed"
                 }
             
-            result = response.json()
+            # Safely handle JSON parsing
+            if not response.text.strip():
+                return {
+                    "answer": "Empty response from API",
+                    "justification": "API returned empty response"
+                }
             
+            try:
+                result = response.json()
+            except ValueError:
+                # JSON decode error - return the raw text
+                return {
+                    "answer": f"Invalid JSON response: {response.text}",
+                    "justification": "API returned invalid JSON format"
+                }
+            
+            # Extract answer from valid JSON response
             if "choices" in result and len(result["choices"]) > 0:
                 answer = result["choices"][0]["message"]["content"]
                 return {
@@ -94,7 +110,7 @@ Answer based only on the provided information."""
                     "answer": "No response generated",
                     "justification": "Empty response from API"
                 }
-                
+            
         except requests.exceptions.RequestException as e:
             return {
                 "answer": f"Network error: {str(e)}",
