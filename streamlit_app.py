@@ -19,7 +19,7 @@ load_dotenv()
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 
 # API configuration for PDF URL processing
-API_URL = "https://your-fastapi-app.onrender.com/api/v1/hackrx/run"
+API_URL = "https://llm-document-retrieval.onrender.com/api/v1/hackrx/run"
 API_KEY = "your_api_key_here"
 
 if not PERPLEXITY_API_KEY:
